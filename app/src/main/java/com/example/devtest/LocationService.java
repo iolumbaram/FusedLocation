@@ -36,8 +36,8 @@ import java.util.Date;
 public class LocationService extends Service implements GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener  {
 
     public static final String TAG = LocationService.class.getSimpleName();
-    private static final long LOCATION_REQUEST_INTERVAL = 10000;
-    private static final float LOCATION_REQUEST_DISPLACEMENT = 5.0f;
+    private static final long LOCATION_REQUEST_INTERVAL =  10 * 1000;  /* 10 secs */
+    private long FASTEST_INTERVAL = 2000; /* 2 sec */
     private GoogleApiClient mGoogleApiClient;
     private FusedLocationProviderClient mFusedLocationProviderClient;
     private LocationRequest mLocationRequest;
@@ -45,110 +45,67 @@ public class LocationService extends Service implements GoogleApiClient.Connecti
 
     @Nullable
     @Override
-    public IBinder onBind(Intent intent) {
-        return null;
-    }
+    public IBinder onBind(Intent intent) {return null;}
 
     @Override
     public void onCreate() {
         super.onCreate();
-
+        Log.d(TAG, "onCreate");
         buildGoogleApiClient();
         showNotificationAndStartForegroundService();
-
-        mLocationCallback = new LocationCallback() {
-            @Override
-            public void onLocationResult(LocationResult locationResult) {
-                super.onLocationResult(locationResult);
-                //here you get the continues location updated based on the interval defined in
-                //location request
-
-                Date currentTime = Calendar.getInstance().getTime();
-
-                String GEOLOCATION_FILE = "geo-location.log";
-                FileOutputStream outputStream;
-                try {
-                    outputStream = openFileOutput(GEOLOCATION_FILE, Context.MODE_APPEND);
-
-                    String geoLog = currentTime+ ", " +Double.toString(locationResult.getLastLocation().getLatitude()) + "," + Double.toString(locationResult.getLastLocation().getLongitude()) + "\n";
-                    outputStream.write(geoLog.getBytes());
-                    outputStream.close();
-
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
-            }
-        };
     }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
+        Log.d(TAG, "START_STICKY");
         mFusedLocationProviderClient = LocationServices.getFusedLocationProviderClient(this);
         return START_STICKY;
     }
 
-    /**
-     * Method used for building GoogleApiClient and add connection callback
-     */
     private synchronized void buildGoogleApiClient() {
         mGoogleApiClient = new GoogleApiClient.Builder(this)
                 .addApi(LocationServices.API)
                 .addConnectionCallbacks(this)
                 .addOnConnectionFailedListener(this)
                 .build();
-
+        Log.d(TAG, "buildGoogleApiClient");
         mGoogleApiClient.connect();
     }
 
-    /**
-     * Method used for creating location request
-     * After successfully connection of the GoogleClient ,
-     * This method used for to request continues location
-     */
     private void createLocationRequest() {
         mLocationRequest = LocationRequest.create();
         mLocationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
         mLocationRequest.setInterval(LOCATION_REQUEST_INTERVAL);
-        mLocationRequest.setSmallestDisplacement(LOCATION_REQUEST_DISPLACEMENT);
+        mLocationRequest.setFastestInterval(FASTEST_INTERVAL);
 
+        Log.d(TAG, "createLocationRequest");
         requestLocationUpdate();
     }
 
-    /**
-     * Method used for the request new location using Google FusedLocation Api
-     */
     private void requestLocationUpdate() {
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED &&
                 ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            // TODO: Consider calling
-            //    ActivityCompat#requestPermissions
-            // here to request the missing permissions, and then overriding
-            //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
-            //                                          int[] grantResults)
-            // to handle the case where the user grants the permission. See the documentation
-            // for ActivityCompat#requestPermissions for more details.
+            Log.d(TAG, "requestLocationUpdate failed - permissions");
             return;
         }
-        mFusedLocationProviderClient.getLastLocation().addOnSuccessListener(new OnSuccessListener<Location>() {
-            @Override
-            public void onSuccess(Location location) {
-                //get the last location of the device
-            }
-        });
+        Log.d(TAG, "requestLocationUpdate");
 
-        mFusedLocationProviderClient.requestLocationUpdates(mLocationRequest, mLocationCallback, Looper.myLooper());
+        mFusedLocationProviderClient.requestLocationUpdates(mLocationRequest, new LocationCallback(){
+            @Override
+            public void onLocationResult(LocationResult locationResult) {
+                String dataStr = Double.toString(locationResult.getLastLocation().getLatitude()) + "," + Double.toString(locationResult.getLastLocation().getLongitude());
+                Log.d(TAG, dataStr);
+                writeLog("geo-location.log", dataStr);
+            }
+        }, Looper.myLooper());
     }
 
     private void removeLocationUpdate() {
         mFusedLocationProviderClient.removeLocationUpdates(mLocationCallback);
     }
 
-    /**
-     * This Method shows notification for ForegroundService
-     * Start Foreground Service and Show Notification to user for android all version
-     */
     private void showNotificationAndStartForegroundService() {
-
+        Log.d(TAG, "showNotificationAndStartForegroundService");
         final String CHANNEL_ID = BuildConfig.APPLICATION_ID.concat("_notification_id");
         final String CHANNEL_NAME = BuildConfig.APPLICATION_ID.concat("_notification_name");
         final int NOTIFICATION_ID = 100;
@@ -198,7 +155,24 @@ public class LocationService extends Service implements GoogleApiClient.Connecti
         super.onDestroy();
         removeLocationUpdate();
         if (mGoogleApiClient != null && mGoogleApiClient.isConnected()) {
+            Log.d(TAG, "onDestroy");
             mGoogleApiClient.disconnect();
+        }
+    }
+
+    private void writeLog(String logFileName, String dataStr){
+        Date currentTime = Calendar.getInstance().getTime();
+        String GEOLOCATION_FILE =logFileName;
+        FileOutputStream outputStream;
+        try {
+            outputStream = openFileOutput(GEOLOCATION_FILE, Context.MODE_APPEND);
+
+            String geoLog = currentTime+ ", " + dataStr  + "\n";
+            outputStream.write(geoLog.getBytes());
+            outputStream.close();
+
+        } catch (Exception e) {
+            e.printStackTrace();
         }
     }
 }
