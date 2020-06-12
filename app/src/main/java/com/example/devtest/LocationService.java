@@ -8,6 +8,8 @@ import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.location.Address;
+import android.location.Geocoder;
 import android.location.Location;
 import android.os.Build;
 import android.os.Bundle;
@@ -30,8 +32,11 @@ import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.tasks.OnSuccessListener;
 
 import java.io.FileOutputStream;
+import java.io.IOException;
 import java.util.Calendar;
 import java.util.Date;
+import java.util.List;
+import java.util.Locale;
 
 public class LocationService extends Service implements GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener  {
 
@@ -42,6 +47,7 @@ public class LocationService extends Service implements GoogleApiClient.Connecti
     private FusedLocationProviderClient mFusedLocationProviderClient;
     private LocationRequest mLocationRequest;
     private LocationCallback mLocationCallback;
+
 
     @Nullable
     @Override
@@ -93,9 +99,7 @@ public class LocationService extends Service implements GoogleApiClient.Connecti
         mFusedLocationProviderClient.requestLocationUpdates(mLocationRequest, new LocationCallback(){
             @Override
             public void onLocationResult(LocationResult locationResult) {
-                String dataStr = Double.toString(locationResult.getLastLocation().getLatitude()) + "," + Double.toString(locationResult.getLastLocation().getLongitude());
-                Log.d(TAG, dataStr);
-                writeLog("geo-location.log", dataStr);
+                writeLog("geo-location.log", locationResult.getLastLocation());
             }
         }, Looper.myLooper());
     }
@@ -160,20 +164,61 @@ public class LocationService extends Service implements GoogleApiClient.Connecti
         }
     }
 
-    private void writeLog(String logFileName, String dataStr){
+    private void writeLog(String logFileName, Location location){
         Date currentTime = Calendar.getInstance().getTime();
+        String locationStr = Double.toString(location.getLatitude()) + "," + Double.toString(location.getLongitude());
+
+
         String GEOLOCATION_FILE =logFileName;
         FileOutputStream outputStream;
         try {
             outputStream = openFileOutput(GEOLOCATION_FILE, Context.MODE_APPEND);
 
-            String geoLog = currentTime+ ", " + dataStr  + "\n";
+            String geoLog = currentTime+ ", " + locationStr +  getAddress(location) + "\n";
             outputStream.write(geoLog.getBytes());
             outputStream.close();
 
         } catch (Exception e) {
             e.printStackTrace();
         }
+    }
+
+    private String getAddress(Location location) {
+        Geocoder geocoder = new Geocoder(this,Locale.getDefault());
+        List<Address> addresses = null;
+        String resultMessage = "";
+
+        try {
+            addresses = geocoder.getFromLocation(location.getLatitude(),location.getLongitude(),1);
+        } catch (IOException ioException) {
+            resultMessage = this.getString(R.string.service_not_available);
+            Log.e(TAG, resultMessage, ioException);
+        }
+
+        if (addresses == null || addresses.size() == 0) {
+            if (resultMessage.isEmpty()) {
+                resultMessage = this.getString(R.string.no_address_found);
+                Log.e(TAG, resultMessage);
+            }
+        } else {
+            Address address = addresses.get(0);
+            StringBuilder out = new StringBuilder();
+            // Fetch the address lines using getAddressLine,
+            // join them, and send them to the thread
+            for (int i = 0; i <= address.getMaxAddressLineIndex(); i++) {
+                out.append(address.getAddressLine(i));
+            }
+
+            resultMessage = out.toString();
+        }
+        return resultMessage;
+    }
+
+    private float getBatteryLevel(){
+        int level = batteryStatus.getIntExtra(BatteryManager.EXTRA_LEVEL, -1);
+        int scale = batteryStatus.getIntExtra(BatteryManager.EXTRA_SCALE, -1);
+
+        return batteryPct = level * 100 / (float)scale;
     }
 }
 
