@@ -43,7 +43,7 @@ import java.util.Locale;
 public class LocationService extends Service implements GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener  {
 
     public static final String TAG = LocationService.class.getSimpleName();
-    private static final long LOCATION_REQUEST_INTERVAL =  10 * 1000;  /* 10 secs */
+    private static final long LOCATION_REQUEST_INTERVAL =  5 * 60 * 1000;  /* 5 mins */
     private long FASTEST_INTERVAL = 2000; /* 2 sec */
     private GoogleApiClient mGoogleApiClient;
     private FusedLocationProviderClient mFusedLocationProviderClient;
@@ -176,7 +176,7 @@ public class LocationService extends Service implements GoogleApiClient.Connecti
         try {
             outputStream = openFileOutput(GEOLOCATION_FILE, Context.MODE_APPEND);
 
-            String geoLog = currentTime+ "," + locationStr+ "," +  getAddress(location)+ "," + getBatteryPercentage() +  "\n";
+            String geoLog = currentTime+ "," + locationStr+ "," +  getAddress(location)+ "," + getBatteryPercentage() +"%"+  "\n";
             outputStream.write(geoLog.getBytes());
             outputStream.close();
 
