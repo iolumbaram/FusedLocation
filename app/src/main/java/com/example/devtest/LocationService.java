@@ -7,10 +7,12 @@ import android.app.NotificationManager;
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.location.Address;
 import android.location.Geocoder;
 import android.location.Location;
+import android.os.BatteryManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.IBinder;
@@ -174,7 +176,7 @@ public class LocationService extends Service implements GoogleApiClient.Connecti
         try {
             outputStream = openFileOutput(GEOLOCATION_FILE, Context.MODE_APPEND);
 
-            String geoLog = currentTime+ ", " + locationStr +  getAddress(location) + "\n";
+            String geoLog = currentTime+ "," + locationStr+ "," +  getAddress(location)+ "," + getBatteryPercentage() +  "\n";
             outputStream.write(geoLog.getBytes());
             outputStream.close();
 
@@ -212,6 +214,27 @@ public class LocationService extends Service implements GoogleApiClient.Connecti
             resultMessage = out.toString();
         }
         return resultMessage;
+    }
+
+    private int getBatteryPercentage() {
+
+        if (Build.VERSION.SDK_INT >= 21) {
+
+            BatteryManager bm = (BatteryManager) this.getSystemService(BATTERY_SERVICE);
+            return bm.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY);
+
+        } else {
+
+            IntentFilter iFilter = new IntentFilter(Intent.ACTION_BATTERY_CHANGED);
+            Intent batteryStatus = this.registerReceiver(null, iFilter);
+
+            int level = batteryStatus != null ? batteryStatus.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) : -1;
+            int scale = batteryStatus != null ? batteryStatus.getIntExtra(BatteryManager.EXTRA_SCALE, -1) : -1;
+
+            double batteryPct = level / (double) scale;
+
+            return (int) (batteryPct * 100);
+        }
     }
 }
 
