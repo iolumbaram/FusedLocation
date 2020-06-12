@@ -213,12 +213,5 @@ public class LocationService extends Service implements GoogleApiClient.Connecti
         }
         return resultMessage;
     }
-
-    private float getBatteryLevel(){
-        int level = batteryStatus.getIntExtra(BatteryManager.EXTRA_LEVEL, -1);
-        int scale = batteryStatus.getIntExtra(BatteryManager.EXTRA_SCALE, -1);
-
-        return batteryPct = level * 100 / (float)scale;
-    }
 }
 
